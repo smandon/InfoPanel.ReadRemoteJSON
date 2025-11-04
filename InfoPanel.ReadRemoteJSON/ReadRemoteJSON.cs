@@ -8,11 +8,13 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+
 
 namespace InfoPanel.ReadRemoteJSON
 {
@@ -59,6 +61,13 @@ namespace InfoPanel.ReadRemoteJSON
                     {
                         _updateInterval = Convert.ToDouble(updateIntervalValue);
                     }
+                    if (TryGetValue("config", "Token", out var tokenValue))
+                    {
+                        if (!string.IsNullOrEmpty(tokenValue))
+                        {
+                            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenValue);
+                        }
+                    }
 
                     CultureInfo ci = new CultureInfo("en-US");
                     foreach (SectionData section in IniData.Sections)
@@ -66,9 +75,17 @@ namespace InfoPanel.ReadRemoteJSON
                         if (section.SectionName.StartsWith("value", true, ci)) {
                             if (TryGetValue(section.SectionName, "Name", out var _nameValue) &&
                             TryGetValue(section.SectionName, "JsonPath", out var _jsonpathValue) &&
+                            TryGetValue(section.SectionName, "DataType", out var _datatypeValue) &&
                             TryGetValue(section.SectionName, "Unit", out var _unitValue))
                             {
-                                defaultContainer.Entries.Add(new PluginSensor(section.SectionName, _nameValue, 0, _unitValue));
+                                if (_datatypeValue.Equals("text"))
+                                {
+                                    defaultContainer.Entries.Add(new PluginText(_nameValue, ""));
+                                }
+                                else
+                                {
+                                    defaultContainer.Entries.Add(new PluginSensor(_nameValue, 0, _unitValue));
+                                }
                                 _jsonpathValues.Add(_jsonpathValue);
                             }
                         }
@@ -96,10 +113,13 @@ namespace InfoPanel.ReadRemoteJSON
                     for (int i=0; i<container.Entries.Count;i++)
                     {
                         string _jsonpath = _jsonpathValues[i];
-                        float value = GetValueFromJson(jsonData, _jsonpath);
                         if (container.Entries[i] is PluginSensor sensor)
                         {
-                            sensor.Value = value;
+                            sensor.Value = GetFloatFromJson(jsonData, _jsonpath);
+                        }
+                        else if (container.Entries[i] is PluginText text)
+                        {
+                            text.Value = GetTextFromJson(jsonData, _jsonpath);
                         }
                     }
                 }
@@ -119,7 +139,7 @@ namespace InfoPanel.ReadRemoteJSON
         public override void Update() => throw new NotImplementedException();
         public override void Close() => _httpClient.Dispose();
 
-        private float GetValueFromJson(string json, string jsonPath)
+        private float GetFloatFromJson(string json, string jsonPath)
         {
             JObject jo = JObject.Parse(json);
             var value = jo.SelectToken(jsonPath);
@@ -130,6 +150,20 @@ namespace InfoPanel.ReadRemoteJSON
             else
             {
                 return 0;
+            }
+        }
+
+        private string GetTextFromJson(string json, string jsonPath)
+        {
+            JObject jo = JObject.Parse(json);
+            var value = jo.SelectToken(jsonPath);
+            if (value != null)
+            {
+                return value.ToString();
+            }
+            else
+            {
+                return "no data";
             }
 
         }

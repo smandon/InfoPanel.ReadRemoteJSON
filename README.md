@@ -31,12 +31,14 @@ A plugin for [InfoPanel](https://github.com/habibrehmansg/infopanel) that allows
     - Change values in the config file:
         - ApiUrl: endpoint of the API your want to query
         - UpdateInterval: update interval in seconds
-        - for each value to read, you must create a `[valueN]` section for each value to read, which must contain three keys:
+        - Token: optional authentication token (will add the token in the authentication HTTP header)
+        - for each value to read, you must create a `[valueN]` section for each value to read, which must contain four keys:
             - Name: the name to display for the sensor
             - JsonPath: [Json Path](https://en.wikipedia.org/wiki/JSONPath) to identify the value you want to read
-            - Unit: the sensor's unit
+            - DataType: the type of data to read, either text or float (to be precise, anything else than text will be treated as float)
+            - Unit: the sensor's unit (optional)
     - Click the **Reload** button to reload the plugins with your configuration
-    - If there is an error and it cannot read values (due to a wrong configuration for example), it will always return zero as value.
+    - If there is an error and it cannot read values (due to a wrong configuration for example), it will always return zero as value for float data type and "no data" for text data type.
 
 ## Configuration example
 I will take the Shelly Plug S as example, it is a Wi-Fi enabled smart plug with integrated power meter. It exposes status data (power, temperature,  relay status...) via a local endpoint as Json Data (cf. [API documentation](https://shelly-api-docs.shelly.cloud/gen1/#shelly-plug-plugs)).
@@ -109,9 +111,10 @@ The JSON data that it sends back looks like this:
 }
 ```
 
-If we want to read both the power and temperature values:
-- for power, user JsonPath value : `$.meters[0].power`
-- for temperature, use JsonPath value: `$.temperature`
+If we want to read both the power and temperature values as well as the new_version:
+- for power, user JsonPath value : `$.meters[0].power` as float data tpye
+- for temperature, use JsonPath value: `$.temperature` as float data type
+- for new_version, use JsonPath value: `$.update.new_version` as text data type
 
 You can use sites like [jsonpath.com](https://jsonpath.com/) to test and validate your JsonPath values.
 
@@ -120,16 +123,25 @@ The config file in that case would look like:
 [config]
 ApiUrl=http://192.168.1.2/status
 UpdateInterval=1
+Token=
 
 [value1]
 Name=Power
 JsonPath=$.meters[0].power
+DataType=float
 Unit=W
 
 [value2]
 Name=Temperature
 JsonPath=$.temperature
+DataType=float
 Unit=°C
+
+[value3]
+Name=New Version
+JsonPath=$.update.new_version
+DataType=text
+Unit=
 ```
 
 > [!WARNING]
@@ -141,6 +153,7 @@ This plugin was developed using the official InfoPanel [plugin development guide
 
 # Version history
 - **1.0.0** Initial release
+- **1.1.0** Added support for an authentication bearer token and data type setting
 
 # External dependencies
 
